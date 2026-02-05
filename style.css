@@ -60,9 +60,9 @@ html, body {
   
   /* 
    * フェードアニメーション
-   * 0.3秒で自然に切り替え
+   * 1.8秒でふわーんと自然に切り替え
    */
-  transition: opacity 0.3s ease-in-out;
+  transition: opacity 1.8s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
 /* 差し替え中の画像（フェードアウト） */
@@ -77,11 +77,10 @@ html, body {
 
 /* 
  * カーソル設定
- * クリック可能であることを隠す（行動を促さない）
- * ユーザーが「気づいたらクリックする」という体験を優先
+ * クリックでダイアログが開くことを示す
  */
 .cell-inner {
-  cursor: default;
+  cursor: pointer;
 }
 
 /* ========================================
@@ -109,3 +108,222 @@ html, body {
  * - ツールチップ
  * - 選択状態の視覚化
  */
+
+/* ========================================
+   モーダルダイアログ
+   ======================================== */
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  background-color: #fff;
+  border-radius: 12px;
+  max-width: 800px;
+  max-height: 90vh;
+  width: 90%;
+  overflow-y: auto;
+  position: relative;
+  padding: 32px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #666;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.modal-close-button:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.modal-header {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-book-image {
+  width: 120px;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+.modal-book-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-book-info h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #222;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.modal-author {
+  font-size: 16px;
+  color: #555;
+  margin: 0;
+}
+
+.modal-publisher {
+  font-size: 14px;
+  color: #888;
+  margin: 0;
+}
+
+.modal-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.dialog-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dialog-section h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.dialog-section p {
+  font-size: 16px;
+  line-height: 1.7;
+  color: #333;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.modal-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.modal-button:active {
+  transform: scale(0.98);
+}
+
+.modal-button.primary {
+  background-color: #ff9900;
+  color: #fff;
+}
+
+.modal-button.primary:hover {
+  background-color: #e68a00;
+}
+
+.modal-button.secondary {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.modal-button.secondary:hover {
+  background-color: #e0e0e0;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .modal-content {
+    padding: 24px;
+    max-height: 95vh;
+  }
+  
+  .modal-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .modal-book-image {
+    width: 160px;
+    height: 240px;
+  }
+  
+  .modal-book-info h2 {
+    font-size: 20px;
+  }
+  
+  .modal-buttons {
+    flex-direction: column-reverse;
+  }
+  
+  .modal-button {
+    width: 100%;
+  }
+}

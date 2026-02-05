@@ -21,17 +21,17 @@
   // 設定値（最小限に留める）
   // ========================================
   const CONFIG = {
-    // 差し替え間隔（ミリ秒）: 0.5秒固定
-    INTERVAL: 500,
+    // 差し替え間隔（ミリ秒）: 3秒
+    INTERVAL: 3000,
     
     // 一度に差し替える枚数: 1枚
     REPLACE_COUNT: 1,
     
-    // フェードアニメーション時間（ミリ秒）
-    FADE_DURATION: 300,
+    // フェードアニメーション時間（ミリ秒）: ふわーんと
+    FADE_DURATION: 1800,
     
     // データファイルのパス
-    DATA_PATH: 'data.json',
+    DATA_PATH: 'data_with_dialogs.json',
     
     // 画像パスのベース
     IMAGE_BASE: '',
@@ -135,13 +135,14 @@
     const inner = document.createElement('div');
     inner.className = 'cell-inner';
     inner.dataset.url = item.url;
+    inner.dataset.itemId = item.id;
     
     const img = document.createElement('img');
     img.src = CONFIG.IMAGE_BASE + item.image;
     img.alt = ''; // 意図的に空（テキスト情報を表示しない）
     img.draggable = false;
     
-    // クリックイベント（シングルクリックで新タブ）
+    // クリックイベント（シングルクリックで詳細表示）
     inner.addEventListener('click', handleClick);
     
     inner.appendChild(img);
@@ -192,8 +193,9 @@
     // 新しい画像を追加
     inner.appendChild(newImg);
     
-    // URLを更新
+    // URLとアイテムIDを更新
     inner.dataset.url = newItem.url;
+    inner.dataset.itemId = newItem.id;
     cellAssignments.set(cell, newItem.id);
     
     // アニメーション開始（次フレームで）
@@ -221,20 +223,202 @@
    * 【重要】
    * - 履歴を保存しない
    * - 状態を変更しない
-   * - ただURLを開くだけ
+   * - ダイアログを表示してから、必要に応じてURLを開く
    */
   function handleClick(event) {
-    const url = event.currentTarget.dataset.url;
+    const itemId = event.currentTarget.dataset.itemId;
+    const item = items.find(i => i.id === itemId);
     
-    if (!url) return;
+    if (!item) return;
     
-    // ネイティブ連携（WKWebView環境）
-    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.openURL) {
-      window.webkit.messageHandlers.openURL.postMessage(url);
-    } else {
-      // ブラウザで新タブを開く
-      window.open(url, '_blank', 'noopener,noreferrer');
+    // ダイアログを表示
+    showDialog(item);
+  }
+
+  // ========================================
+  // ダイアログ表示
+  // ========================================
+  
+  /**
+   * ダイアログモーダルを表示
+   */
+  function showDialog(item) {
+    // 既存のダイアログがあれば削除
+    const existingDialog = document.getElementById('dialog-modal');
+    if (existingDialog) {
+      existingDialog.remove();
     }
+    
+    // モーダル要素を作成
+    const modal = document.createElement('div');
+    modal.id = 'dialog-modal';
+    modal.className = 'modal';
+    
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    
+    // 閉じるボタン（右上）
+    const closeButtonTop = document.createElement('button');
+    closeButtonTop.className = 'modal-close-button';
+    closeButtonTop.innerHTML = '&times;';
+    closeButtonTop.addEventListener('click', () => {
+      modal.remove();
+    });
+    
+    // ヘッダー部分（画像・タイトル・著者・出版社）
+    const header = document.createElement('div');
+    header.className = 'modal-header';
+    
+    const bookImage = document.createElement('img');
+    bookImage.src = CONFIG.IMAGE_BASE + item.image;
+    bookImage.alt = item.title;
+    bookImage.className = 'modal-book-image';
+    
+    const bookInfo = document.createElement('div');
+    bookInfo.className = 'modal-book-info';
+    
+    const title = document.createElement('h2');
+    title.textContent = item.title;
+    
+    const author = document.createElement('p');
+    author.className = 'modal-author';
+    author.textContent = item.author;
+    
+    const publisher = document.createElement('p');
+    publisher.className = 'modal-publisher';
+    publisher.textContent = item.publisher;
+    
+    bookInfo.appendChild(title);
+    bookInfo.appendChild(author);
+    bookInfo.appendChild(publisher);
+    
+    header.appendChild(bookImage);
+    header.appendChild(bookInfo);
+    
+    // ダイアログ内容（配列形式に対応）
+    const dialogContent = document.createElement('div');
+    dialogContent.className = 'modal-dialog-content';
+    
+    if (item.dialog && Array.isArray(item.dialog)) {
+      // dialogが配列の場合
+      const dialogLabels = [
+        'カテゴリー',
+        '【構成】',
+        '【刺さるポイント】',
+        '【おすすめ人】',
+        '【不要な人】',
+        '著者の主張',
+        '関連する他の本',
+        '一言メッセージ'
+      ];
+      
+      item.dialog.forEach((text, index) => {
+        if (text && text.trim()) {
+          const section = document.createElement('div');
+          section.className = 'dialog-section';
+          
+          // ラベルを抽出（テキスト内に含まれている場合）
+          let label = dialogLabels[index] || `項目 ${index + 1}`;
+          let content = text;
+          
+          // テキスト内に【】があればそれをラベルとして使用
+          const labelMatch = text.match(/^【(.+?)】/);
+          if (labelMatch) {
+            label = labelMatch[0];
+            content = text.substring(labelMatch[0].length).trim();
+          }
+          
+          const sectionLabel = document.createElement('h3');
+          sectionLabel.textContent = label;
+          
+          const sectionContent = document.createElement('p');
+          sectionContent.textContent = content;
+          
+          section.appendChild(sectionLabel);
+          section.appendChild(sectionContent);
+          dialogContent.appendChild(section);
+        }
+      });
+    } else if (item.dialog && typeof item.dialog === 'object') {
+      // dialogがオブジェクトの場合（元の実装）
+      const dialogItems = [
+        { label: 'カテゴリー', key: 'category' },
+        { label: 'なぜこの本を選んだか', key: 'why_selected' },
+        { label: 'この本から得られること', key: 'what_you_get' },
+        { label: '特に印象的だった部分', key: 'impressive_part' },
+        { label: 'この本をおすすめしたい人', key: 'recommended_for' },
+        { label: '関連する他の本', key: 'related_books' },
+        { label: '読後の行動提案', key: 'action_suggestion' },
+        { label: '一言メッセージ', key: 'one_word' }
+      ];
+      
+      dialogItems.forEach(({ label, key }) => {
+        if (item.dialog[key]) {
+          const section = document.createElement('div');
+          section.className = 'dialog-section';
+          
+          const sectionLabel = document.createElement('h3');
+          sectionLabel.textContent = label;
+          
+          const sectionContent = document.createElement('p');
+          sectionContent.textContent = item.dialog[key];
+          
+          section.appendChild(sectionLabel);
+          section.appendChild(sectionContent);
+          dialogContent.appendChild(section);
+        }
+      });
+    }
+    
+    // ボタンエリア
+    const buttonArea = document.createElement('div');
+    buttonArea.className = 'modal-buttons';
+    
+    const openButton = document.createElement('button');
+    openButton.className = 'modal-button primary';
+    openButton.textContent = 'Amazonで見る';
+    openButton.addEventListener('click', () => {
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.openURL) {
+        window.webkit.messageHandlers.openURL.postMessage(item.url);
+      } else {
+        window.open(item.url, '_blank', 'noopener,noreferrer');
+      }
+    });
+    
+    const closeButton = document.createElement('button');
+    closeButton.className = 'modal-button secondary';
+    closeButton.textContent = '閉じる';
+    closeButton.addEventListener('click', () => {
+      modal.remove();
+    });
+    
+    buttonArea.appendChild(openButton);
+    buttonArea.appendChild(closeButton);
+    
+    // すべてを組み立て
+    modalContent.appendChild(closeButtonTop);
+    modalContent.appendChild(header);
+    modalContent.appendChild(dialogContent);
+    modalContent.appendChild(buttonArea);
+    modal.appendChild(modalContent);
+    
+    // モーダルの外側クリックで閉じる
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+    
+    // ESCキーで閉じる
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        modal.remove();
+        document.removeEventListener('keydown', handleEsc);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    
+    document.body.appendChild(modal);
   }
 
   // ========================================
