@@ -295,77 +295,91 @@
     header.appendChild(bookImage);
     header.appendChild(bookInfo);
     
-    // ダイアログ内容（配列形式に対応）
+    // ダイアログ内容（カード型グリッドレイアウト）
     const dialogContent = document.createElement('div');
     dialogContent.className = 'modal-dialog-content';
     
+    const cardIcons = ["🎯", "📚", "✨", "💡", "📖", "💬", "👥", "💭"];
+    const cardLabels = [
+      "カテゴリー",
+      "構成",
+      "刺さるポイント①",
+      "刺さるポイント②",
+      "概要",
+      "著者の主張",
+      "おすすめな人",
+      "一言メッセージ"
+    ];
+    
     if (item.dialog && Array.isArray(item.dialog)) {
       // dialogが配列の場合
-      const dialogLabels = [
-        'カテゴリー',
-        '【構成】',
-        '【刺さるポイント】',
-        '【おすすめ人】',
-        '【不要な人】',
-        '著者の主張',
-        '関連する他の本',
-        '一言メッセージ'
-      ];
-      
       item.dialog.forEach((text, index) => {
         if (text && text.trim()) {
-          const section = document.createElement('div');
-          section.className = 'dialog-section';
+          const card = document.createElement('div');
+          card.className = 'dialog-card';
           
-          // ラベルを抽出（テキスト内に含まれている場合）
-          let label = dialogLabels[index] || `項目 ${index + 1}`;
-          let content = text;
+          const cardHeader = document.createElement('div');
+          cardHeader.className = 'dialog-card-header';
           
-          // テキスト内に【】があればそれをラベルとして使用
-          const labelMatch = text.match(/^【(.+?)】/);
-          if (labelMatch) {
-            label = labelMatch[0];
-            content = text.substring(labelMatch[0].length).trim();
-          }
+          const icon = document.createElement('span');
+          icon.className = 'dialog-card-icon';
+          icon.textContent = cardIcons[index] || '📌';
           
-          const sectionLabel = document.createElement('h3');
-          sectionLabel.textContent = label;
+          const label = document.createElement('h3');
+          label.className = 'dialog-card-label';
+          label.textContent = cardLabels[index] || `項目 ${index + 1}`;
           
-          const sectionContent = document.createElement('p');
-          sectionContent.textContent = content;
+          cardHeader.appendChild(icon);
+          cardHeader.appendChild(label);
           
-          section.appendChild(sectionLabel);
-          section.appendChild(sectionContent);
-          dialogContent.appendChild(section);
+          const cardText = document.createElement('p');
+          cardText.className = 'dialog-card-text';
+          cardText.textContent = text;
+          
+          card.appendChild(cardHeader);
+          card.appendChild(cardText);
+          dialogContent.appendChild(card);
         }
       });
     } else if (item.dialog && typeof item.dialog === 'object') {
       // dialogがオブジェクトの場合（元の実装）
       const dialogItems = [
-        { label: 'カテゴリー', key: 'category' },
-        { label: 'なぜこの本を選んだか', key: 'why_selected' },
-        { label: 'この本から得られること', key: 'what_you_get' },
-        { label: '特に印象的だった部分', key: 'impressive_part' },
-        { label: 'この本をおすすめしたい人', key: 'recommended_for' },
-        { label: '関連する他の本', key: 'related_books' },
-        { label: '読後の行動提案', key: 'action_suggestion' },
-        { label: '一言メッセージ', key: 'one_word' }
+        { label: 'カテゴリー', key: 'category', icon: '🎯' },
+        { label: '構成', key: 'why_selected', icon: '📚' },
+        { label: 'この本から得られること', key: 'what_you_get', icon: '✨' },
+        { label: '特に印象的だった部分', key: 'impressive_part', icon: '💡' },
+        { label: 'この本をおすすめしたい人', key: 'recommended_for', icon: '👥' },
+        { label: '関連する他の本', key: 'related_books', icon: '📖' },
+        { label: '読後の行動提案', key: 'action_suggestion', icon: '💬' },
+        { label: '一言メッセージ', key: 'one_word', icon: '💭' }
       ];
       
-      dialogItems.forEach(({ label, key }) => {
+      dialogItems.forEach(({ label, key, icon }) => {
         if (item.dialog[key]) {
-          const section = document.createElement('div');
-          section.className = 'dialog-section';
+          const card = document.createElement('div');
+          card.className = 'dialog-card';
           
-          const sectionLabel = document.createElement('h3');
-          sectionLabel.textContent = label;
+          const cardHeader = document.createElement('div');
+          cardHeader.className = 'dialog-card-header';
           
-          const sectionContent = document.createElement('p');
-          sectionContent.textContent = item.dialog[key];
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'dialog-card-icon';
+          iconSpan.textContent = icon;
           
-          section.appendChild(sectionLabel);
-          section.appendChild(sectionContent);
-          dialogContent.appendChild(section);
+          const labelH3 = document.createElement('h3');
+          labelH3.className = 'dialog-card-label';
+          labelH3.textContent = label;
+          
+          cardHeader.appendChild(iconSpan);
+          cardHeader.appendChild(labelH3);
+          
+          const cardText = document.createElement('p');
+          cardText.className = 'dialog-card-text';
+          cardText.textContent = item.dialog[key];
+          
+          card.appendChild(cardHeader);
+          card.appendChild(cardText);
+          dialogContent.appendChild(card);
         }
       });
     }
