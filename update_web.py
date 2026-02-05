@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 """
-記号接地待ち Web版 更新スクリプト
+記号接地待ち Web版 更新スクリプト（Selenium版）
 
-このスクリプトは以下を行います：
-1. Amazonほしい物リストから商品情報を取得
-2. 商品画像をダウンロード
-3. data.json を生成
-4. GitHubにプッシュ
+Seleniumを使ってほしい物リストを全件スクロールして取得します。
 """
 
 import json
@@ -16,79 +12,115 @@ import subprocess
 import sys
 import time
 import urllib.request
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 
 # 設定
 WISHLIST_URL = "https://www.amazon.co.jp/hz/wishlist/ls/2UQ7O1570CFAX"
 WEB_DIR = os.path.expanduser("~/Desktop/symbol-grounding-web")
 IMAGES_DIR = os.path.join(WEB_DIR, "images")
 
-def fetch_wishlist_html(url):
-    """ほしい物リストのHTMLを取得"""
-    print(f"📥 ほしい物リストを取得中: {url}")
+def setup_driver():
+    """Chromeドライバーをセットアップ"""
+    print("🌐 ブラウザを起動中...")
     
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
-    }
+    options = Options()
+    options.add_argument('--headless')  # ヘッドレスモード
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--window-size=1920,1080')
+    options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
-    req = urllib.request.Request(url, headers=headers)
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
     
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            html = response.read().decode('utf-8')
-            return html
-    except Exception as e:
-        print(f"❌ HTMLの取得に失敗: {e}")
-        return None
+    return driver
 
-def parse_wishlist(html):
-    """HTMLから商品情報を抽出"""
+def scroll_and_load_all(driver):
+    """ページを最後までスクロールして全件読み込む"""
+    print("📜 スクロールして全件読み込み中...")
+    
+    last_height = driver.execute_script("return document.body.scrollHeight")
+    scroll_count = 0
+    
+    while True:
+        # ページ下部にスクロール
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        scroll_count += 1
+        print(f"  スクロール {scroll_count}回目...")
+        
+        # 読み込み待ち
+        time.sleep(2)
+        
+        # 新しい高さを取得
+        new_height = driver.execute_script("return document.body.scrollHeight")
+        
+        # 高さが変わらなければ終了
+        if new_height == last_height:
+            # もう一度試す
+            time.sleep(2)
+            new_height = driver.execute_script("return document.body.scrollHeight")
+            if new_height == last_height:
+                break
+        
+        last_height = new_height
+    
+    print(f"  ✓ スクロール完了（{scroll_count}回）")
+
+def parse_wishlist(driver):
+    """ページから商品情報を抽出"""
     print("🔍 商品情報を解析中...")
     
     items = []
     
-    item_pattern = re.compile(
-        r'id="itemName_([^"]+)"[^>]*title="([^"]*)"[^>]*href="(/dp/([A-Z0-9]+)/[^"]*)"',
-        re.DOTALL
-    )
-    
-    img_pattern = re.compile(
-        r'src="(https://m\.media-amazon\.com/images/I/[^"]+\._SS135_\.jpg)"'
-    )
-    
-    all_images = img_pattern.findall(html)
-    
-    for match in item_pattern.finditer(html):
-        item_id = match.group(1)
-        title = match.group(2)
-        href = match.group(3)
-        asin = match.group(4)
+    # 商品要素を取得
+    try:
+        item_elements = driver.find_elements(By.CSS_SELECTOR, '[id^="itemName_"]')
         
-        item_pos = match.start()
-        
-        img_url = None
-        for img in all_images:
-            img_pos = html.find(img)
-            if img_pos < item_pos and img_pos > item_pos - 2000:
-                img_url = img
-        
-        if not img_url:
-            item_index = len(items)
-            if item_index < len(all_images):
-                img_url = all_images[item_index + 2]
-        
-        if img_url:
-            img_url_hd = img_url.replace('._SS135_.', '._SL500_.')
-            
-            items.append({
-                'id': asin,
-                'name': title,
-                'url': f'https://www.amazon.co.jp/dp/{asin}',
-                'image_url': img_url_hd
-            })
-            
-            print(f"  ✓ {title[:40]}...")
+        for element in item_elements:
+            try:
+                # ASIN/IDを取得
+                item_id = element.get_attribute('id').replace('itemName_', '')
+                
+                # タイトルを取得
+                title = element.get_attribute('title') or element.text
+                
+                # リンクからASINを取得
+                href = element.get_attribute('href')
+                asin_match = re.search(r'/dp/([A-Z0-9]+)', href)
+                if asin_match:
+                    asin = asin_match.group(1)
+                else:
+                    continue
+                
+                # 画像URLを探す（親要素を遡って探す）
+                parent = element.find_element(By.XPATH, './ancestor::li[contains(@class, "g-item")]')
+                img_element = parent.find_element(By.CSS_SELECTOR, 'img[src*="media-amazon.com"]')
+                img_url = img_element.get_attribute('src')
+                
+                # 高解像度版に変換
+                if img_url:
+                    img_url_hd = re.sub(r'\._[^.]+_\.', '._SL500_.', img_url)
+                    
+                    items.append({
+                        'id': asin,
+                        'name': title,
+                        'url': f'https://www.amazon.co.jp/dp/{asin}',
+                        'image_url': img_url_hd
+                    })
+                    
+                    print(f"  ✓ {title[:40]}...")
+                    
+            except Exception as e:
+                continue
+                
+    except Exception as e:
+        print(f"  ⚠️ 解析エラー: {e}")
     
     print(f"📚 {len(items)} 件の商品を発見")
     return items
@@ -134,7 +166,7 @@ def download_images(items, output_dir):
                 'name': item['name']
             })
             
-            time.sleep(0.5)
+            time.sleep(0.3)
             
         except Exception as e:
             print(f"  ❌ {filename}: {e}")
@@ -166,10 +198,8 @@ def push_to_github(web_dir):
     try:
         os.chdir(web_dir)
         
-        # Git add
         subprocess.run(['git', 'add', '.'], check=True)
         
-        # Git commit
         result = subprocess.run(
             ['git', 'commit', '-m', f'Update wishlist: {time.strftime("%Y-%m-%d %H:%M")}'],
             capture_output=True,
@@ -180,7 +210,6 @@ def push_to_github(web_dir):
             print("  ℹ️  変更なし")
             return True
         
-        # Git push
         subprocess.run(['git', 'push'], check=True)
         
         print("  ✓ プッシュ完了")
@@ -192,37 +221,53 @@ def push_to_github(web_dir):
 
 def main():
     print("=" * 50)
-    print("🖼  記号接地待ち Web版 更新スクリプト")
+    print("🖼  記号接地待ち Web版 更新スクリプト（Selenium版）")
     print("=" * 50)
     
-    # 1. ほしい物リストを取得
-    html = fetch_wishlist_html(WISHLIST_URL)
-    if not html:
-        print("❌ ほしい物リストの取得に失敗しました")
+    driver = None
+    
+    try:
+        # 1. ブラウザを起動
+        driver = setup_driver()
+        
+        # 2. ほしい物リストにアクセス
+        print(f"\n📥 ほしい物リストにアクセス中...")
+        driver.get(WISHLIST_URL)
+        time.sleep(3)
+        
+        # 3. 全件読み込むまでスクロール
+        scroll_and_load_all(driver)
+        
+        # 4. 商品情報を解析
+        items = parse_wishlist(driver)
+        
+        if not items:
+            print("❌ 商品情報の取得に失敗しました")
+            sys.exit(1)
+        
+        # 5. 画像をダウンロード
+        downloaded = download_images(items, IMAGES_DIR)
+        
+        # 6. data.json を生成
+        data_json_path = os.path.join(WEB_DIR, "data.json")
+        generate_data_json(downloaded, data_json_path)
+        
+        # 7. GitHubにプッシュ
+        if push_to_github(WEB_DIR):
+            print("\n" + "=" * 50)
+            print("✅ 更新完了！")
+            print("   https://morikazusuma.github.io/symbol-grounding/")
+            print("=" * 50)
+        else:
+            print("\n⚠️  プッシュに失敗しましたが、ローカルは更新されました")
+            
+    except Exception as e:
+        print(f"❌ エラー: {e}")
         sys.exit(1)
-    
-    # 2. 商品情報を解析
-    items = parse_wishlist(html)
-    if not items:
-        print("❌ 商品情報の解析に失敗しました")
-        sys.exit(1)
-    
-    # 3. 画像をダウンロード
-    downloaded = download_images(items, IMAGES_DIR)
-    
-    # 4. data.json を生成
-    data_json_path = os.path.join(WEB_DIR, "data.json")
-    generate_data_json(downloaded, data_json_path)
-    
-    # 5. GitHubにプッシュ
-    if push_to_github(WEB_DIR):
-        print("\n" + "=" * 50)
-        print("✅ 更新完了！")
-        print("   https://morikazusuma.github.io/symbol-grounding/")
-        print("=" * 50)
-    else:
-        print("\n⚠️  プッシュに失敗しましたが、ローカルは更新されました")
-        print("   手動でgit pushしてください")
+        
+    finally:
+        if driver:
+            driver.quit()
 
 if __name__ == "__main__":
     main()
