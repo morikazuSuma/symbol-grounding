@@ -1,0 +1,111 @@
+/* ========================================
+   記号接地待ちスクリーンセイバー - style.css
+   ========================================
+   
+   【設計思想】
+   - 余白なし、画面全体に敷き詰める
+   - 秩序はあるが意味は持たせない（均一グリッド）
+   - 遷移は控えめで自然（急激な変化を避ける）
+   - テキスト情報は一切表示しない
+   
+   【禁止事項】
+   - ホバーエフェクト（注意を引きすぎる）
+   - ボーダー、シャドウ（個別性を強調してしまう）
+   - スピナー、ローディング表示（待機感を生む）
+   ======================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #000;
+}
+
+#grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  /* デスクトップ: 14列 */
+  grid-template-columns: repeat(14, 1fr);
+  grid-auto-rows: 1fr;
+}
+
+/* グリッドを本の表紙比率（2:3）に保つためのラッパー */
+.cell {
+  position: relative;
+  width: 100%;
+  padding-bottom: 150%; /* アスペクト比 2:3 を維持 */
+  overflow: hidden;
+}
+
+.cell-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cell-inner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  
+  /* 
+   * フェードアニメーション
+   * 0.3秒で自然に切り替え
+   */
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* 差し替え中の画像（フェードアウト） */
+.cell-inner img.fading-out {
+  opacity: 0;
+}
+
+/* 新しい画像（フェードイン） */
+.cell-inner img.fading-in {
+  opacity: 1;
+}
+
+/* 
+ * カーソル設定
+ * クリック可能であることを隠す（行動を促さない）
+ * ユーザーが「気づいたらクリックする」という体験を優先
+ */
+.cell-inner {
+  cursor: default;
+}
+
+/* ========================================
+   レスポンシブ対応
+   ======================================== */
+
+/* タブレット: 8列 */
+@media (max-width: 1200px) {
+  #grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+}
+
+/* スマートフォン: 3列 */
+@media (max-width: 600px) {
+  #grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* 
+ * 【明示的に実装しないもの】
+ * - :hover による拡大・ハイライト
+ * - :active による押下フィードバック
+ * - ツールチップ
+ * - 選択状態の視覚化
+ */
